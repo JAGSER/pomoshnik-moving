@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Помощник AI переехал</title>
+<meta name="theme-color" content="#F6F1E9">
+<style>
+  :root { --bg: #F6F1E9; --ink: #1F1B16; --muted: #6E655A; --accent: #B5532E; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1B1814; --ink: #F2ECE3; --muted: #A99F92; --accent: #E07A50; } }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 18px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; box-sizing: border-box; text-align: center; }
+  svg { width: 96px; height: 96px; border-radius: 22px; }
+  h1 { margin: 0; font-size: 1.4em; }
+  p { margin: 0; color: var(--muted); max-width: 26em; }
+  a { color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#B5532E"/><path d="M146 250a110 110 0 0 0 220 0" fill="none" stroke="#FFFDF9" stroke-width="34" stroke-linecap="round"/><circle cx="256" cy="186" r="48" fill="#FFFDF9"/></svg>
+  <h1>Помощник AI переезжает</h1>
+  <p id="msg">Переносим ваши разговоры на новый адрес…</p>
+  <p><a id="go" href="https://pomoshnik.ai/">pomoshnik.ai</a></p>
+</main>
+<script>
+// Старый адрес ai.duetplay.app: упаковываем вход, настройки и разговоры, передаём через прослойку
+// и открываем pomoshnik.ai — там они распакуются. Если что-то не так, просто переходим.
+(async () => {
+  const NEW = "https://pomoshnik.ai/", PROXY = "https://pomoshnik.jagser.deno.net";
+  const go = (code) => location.replace(NEW + (code ? "#m=" + code : ""));
+  const fallback = setTimeout(() => go(null), 20000);
+  try {
+    const ls = {};
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); ls[k] = localStorage.getItem(k); }
+    let session = null; try { session = JSON.parse(ls.session || "null"); } catch (_) {}
+    const readAll = (name) => new Promise((res) => {
+      try {
+        const r = indexedDB.open(name);
+        r.onupgradeneeded = () => { try { r.transaction.abort(); } catch (_) {} };
+        r.onsuccess = () => {
+          const db = r.result;
+          if (!db.objectStoreNames.contains("chats")) { db.close(); return res([]); }
+          const g = db.transaction("chats").objectStore("chats").getAll();
+          g.onsuccess = () => { db.close(); res(g.result || []); };
+          g.onerror = () => { db.close(); res([]); };
+        };
+        r.onerror = r.onblocked = () => res([]);
+      } catch (_) { res([]); }
+    });
+    const chats = await readAll("pomoshnik-chats");
+    const seen = new Set(chats.map((c) => c.id));
+    (await readAll("pomoshnik")).forEach((c) => { if (!seen.has(c.id)) chats.push(c); });
+    if (!session || !session.password) { clearTimeout(fallback); return go(null); }
+    const r = await fetch(PROXY + "/migrate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: session.user, password: session.password, data: JSON.stringify({ ls, chats }) }),
+    });
+    const d = await r.json();
+    clearTimeout(fallback);
+    go(r.ok && d.code ? d.code : null);
+  } catch (e) {
+    clearTimeout(fallback);
+    document.getElementById("msg").textContent = "Не получилось перенести разговоры автоматически. Нажмите на новый адрес и войдите по своему паролю.";
+  }
+})();
+if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.update())).catch(() => {});
+</script>
+</body>
+</html>
