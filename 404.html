@@ -29,6 +29,15 @@
 (async () => {
   const NEW = "https://pomoshnik.ai/", PROXY = "https://pomoshnik.jagser.deno.net";
   const go = (code) => location.replace(NEW + (code ? "#m=" + code : ""));
+  // ждём, пока новый адрес заработает (после переезда ему нужно время на сертификат)
+  const msg = document.getElementById("msg");
+  for (let i = 0; ; i++) {
+    const ok = await fetch(NEW + "config.json?t=" + Date.now(), { cache: "no-store" }).then((r) => r.ok).catch(() => false);
+    if (ok) break;
+    msg.textContent = "Новый адрес ещё настраивается — минутку, всё произойдёт само. Не закрывайте эту страницу.";
+    await new Promise((r) => setTimeout(r, 20000));
+  }
+  msg.textContent = "Переносим ваши разговоры на новый адрес…";
   const fallback = setTimeout(() => go(null), 20000);
   try {
     const ls = {};
