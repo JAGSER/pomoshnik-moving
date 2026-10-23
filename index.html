@@ -38,12 +38,13 @@
     await new Promise((r) => setTimeout(r, 20000));
   }
   msg.textContent = "Переносим ваши разговоры на новый адрес…";
-  const fallback = setTimeout(() => go(null), 20000);
+  let fallback = setTimeout(() => go(null), 30000);
   try {
     const ls = {};
     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); ls[k] = localStorage.getItem(k); }
     let session = null; try { session = JSON.parse(ls.session || "null"); } catch (_) {}
     const readAll = (name) => new Promise((res) => {
+      setTimeout(() => res([]), 4000); // хранилище занято или зависло — не ждём
       try {
         const r = indexedDB.open(name);
         r.onupgradeneeded = () => { try { r.transaction.abort(); } catch (_) {} };
